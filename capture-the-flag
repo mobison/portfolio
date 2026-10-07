@@ -1,0 +1,142 @@
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+
+const PORT = 3000;
+
+// Track all players and their scores: { "StudentName": score }
+let scoreboard = {};
+let scoreboard = {};
+
+const challenges = [
+  // Part 1: Playbook & Phishing (#1 - #12)
+  { id: 1, category: "Playbook", title: "Port Secure", prompt: "What port is https?", flag: "FLAG{443}" },
+  { id: 2, category: "Playbook", title: "MFA Defense", prompt: "What does MFA stand for?", flag: "FLAG{multi-factor authentication}" },
+  { id: 3, category: "Playbook", title: "Firewall Rules", prompt: "What network security tool blocks bad traffic? Starts with F.", flag: "FLAG{firewall}" },
+  { id: 4, category: "Playbook", title: "Antivirus Tool", prompt: "What software scans files for known malware signatures? (two words)", flag: "FLAG{antivirus}" },
+  { id: 5, category: "Playbook", title: "Safe Browsing", prompt: "What secure protocol should a website URL start with instead of http?", flag: "FLAG{https}" },
+  { id: 6, category: "Playbook", title: "Phishing", prompt: "What is the name of the engineering attackers use to decieve you to click on a link?", flag: "FLAG{social engineering}" },
+  { id: 7, category: "Phishing", title: "Phishing Trick", prompt: "Phishing emails often create a false sense of what to make you panic?", flag: "FLAG{urgency}" },
+  { id: 8, category: "Phishing", title: "Fake Links", prompt: "Always check the URL link for spelling errors or what kind of trick?", flag: "FLAG{typo}" },
+  { id: 9, category: "Phishing", title: "Password Sharing", prompt: "Should you ever share your password with a friend? Type yes or no.", flag: "FLAG{no}" },
+  { id: 10, category: "Phishing", title: "Suspicious Attachment", prompt: "What file type attachment is most dangerous to open from strangers? Type exe.", flag: "FLAG{exe}" },
+  { id: 11, category: "Phishing", title: "Sender Check", prompt: "Always verify the sender's -------- before replying?", flag: "FLAG{email}" },
+  { id: 12, category: "Phishing", title: "Phish Drill Done", prompt: "Type 'pass' to complete the phishing intro round.", flag: "FLAG{pass}" },
+
+  // Part 2: Caesar Ciphers & Cryptography (#13 - #28)
+  { id: 13, category: "Cryptography", title: "Caesar Shift 1", prompt: "Decrypt ciphertext shifted by 1: GBC", flag: "FLAG{fab}" },
+  { id: 14, category: "Cryptography", title: "Caesar Shift 1", prompt: "Decrypt ciphertext shifted by 1: KHOO", flag: "FLAG{jinn}" }, // simplified or straight prompt
+  { id: 15, category: "Cryptography", title: "Caesar Shift 3", prompt: "Decrypt ciphertext shifted by 3: KHOOR", flag: "FLAG{hello}" },
+  { id: 16, category: "Cryptography", title: "ROT13 Cipher", prompt: "Decrypt ROT13 ciphertext: URYYB", flag: "FLAG{hello}" },
+  { id: 17, category: "Cryptography", title: "Caesar Shift 3", prompt: "Decrypt ciphertext shifted by 3: FRU", flag: "FLAG{cro}" },
+  { id: 18, category: "Cryptography", title: "Plain Alphabet", prompt: "What is the first letter of the English alphabet?", flag: "FLAG{a}" },
+  { id: 19, category: "Cryptography", title: "Simple Shift", prompt: "Shift 'ABC' forward by 1 letter. What do you get?", flag: "FLAG{bcd}" },
+  { id: 20, category: "Cryptography", title: "Secret Word", prompt: "Decrypt ROT13 of 'CAT': P", flag: "FLAG{png}" }, // let's make it direct: "What is 1+1?" -> FLAG{2}
+  { id: 21, category: "Cryptography", title: "Binary", prompt: "What is 0001 binary in decimal?", flag: "FLAG{1}" },
+  { id: 22, category: "Cryptography", title: "Crypto Boss", prompt: "Type 'crypto' to clear this cryptography level.", flag: "FLAG{crypto}" },
+  { id: 23, category: "Cryptography", title: "Reverse Text", prompt: "Spell the word 'dog' backwards.", flag: "FLAG{god}" },
+  { id: 24, category: "Cryptography", title: "Hashing Property", prompt: "Can you reverse a secure hash back to plain text easily? Type no.", flag: "FLAG{no}" },
+  { id: 25, category: "Cryptography", title: "ceasar cipher", prompt: "How many shifts does ceaser shift have?", flag: "FLAG{26}" },
+  { id: 26, category: "Cryptography", title: "Secret Code", prompt: "Type the word 'secure'.", flag: "FLAG{secure}" },
+  { id: 27, category: "Cryptography", title: "Password evolution", prompt: "Passwords evolved to pass_____:", flag: "FLAG{phrase}" },
+  { id: 28, category: "Cryptography", title: "Crypto Done", prompt: "Type 'done' to finish crypto.", flag: "FLAG{done}" },
+
+  // Part 3: Web Security & OSINT (#29 - #40)
+  { id: 29, category: "Web Security", title: "Source Code", prompt: "Where do web developers leave hidden text notes in HTML code?", flag: "FLAG{comments}" },
+  { id: 30, category: "Web Security", title: "Robots File", prompt: "What text file tells web search engines what pages to ignore?", flag: "FLAG{robots.txt}" },
+  { id: 31, category: "Web Security", title: "Cookie Role", prompt: "Change user cookie from guest to what to get access?", flag: "FLAG{admin}" },
+  { id: 32, category: "Web Security", title: "Hidden Input", prompt: "What HTML tag input type is invisible to regular users?", flag: "FLAG{hidden}" },
+  { id: 33, category: "Web Security", title: "SQL Quote", prompt: "What punctuation mark (') causes database syntax errors when injected?", flag: "FLAG{quote}" },
+  { id: 34, category: "Web Security", title: "SQL Bypass", prompt: "Type 'bypass' to pass this login check.", flag: "FLAG{bypass}" },
+  { id: 35, category: "Web Security", title: "file server port", prompt: "What port does file servers leave for communication", flag: "FLAG{21}" },
+  { id: 36, category: "Web Security", title: "file server secure", prompt: "What is the secure version of FTP.", flag: "FLAG{sftp}" },
+  { id: 37, category: "Web Security", title: "Reflected XSS", prompt: "What script tag language is used for web browser attacks? Starts with j.", flag: "FLAG{javascript}" },
+  { id: 38, category: "Web Security", title: "Comment Board", prompt: "Type 'post' to submit a comment.", flag: "FLAG{post}" },
+  { id: 39, category: "Web Security", title: "ID Parameter", prompt: "What number usually represents the main administrator ID in databases?", flag: "FLAG{1}" },
+  { id: 40, category: "Web Security", title: "Web Master", prompt: "Type 'web' to finish web security.", flag: "FLAG{web}" },
+
+  // Part 4: Digital Forensics (#41 - #50)
+  { id: 41, category: "Forensics", title: "File Data", prompt: "What term describes 'data about data' inside a digital file?", flag: "FLAG{metadata}" },
+  { id: 42, category: "Forensics", title: "File Extension", prompt: "What is the term given to the suffix that comes at the end of a filename", flag: "FLAG{extension}" },
+  { id: 43, category: "Forensics", title: "cloud", prompt: "What do they call severs that you use remotely?", flag: "FLAG{cloud}" },
+  { id: 44, category: "Forensics", title: "Failed Logins", prompt: "What security event tracks multiple wrong password attempts?", flag: "FLAG{bruteforce}" },
+  { id: 45, category: "Forensics", title: "Linux", prompt: "What Linux command shows current folder", flag: "FLAG{pwd}" },
+  { id: 46, category: "Forensics", title: "Success Event", prompt: "Type 'success' for a successful login log.", flag: "FLAG{success}" },
+  { id: 47, category: "Forensics", title: "Linux", prompt: "Type 'fail' for a failed login log.", flag: "FLAG{fail}" },
+  { id: 48, category: "Forensics", title: "Linux", prompt: "What linix command is used to navigate to a new folder?", flag: "FLAG{cd}" },
+  { id: 49, category: "Forensics", title: "RAM", prompt: "What is the full meaning of RAM in computer memory", flag: "FLAG{Random Access Memory}" },
+  { id: 50, category: "Forensics", title: "IpAddress", prompt: "Which of this is a public IP 192.168.1.0 or 10.0.5.1 ?", flag: "FLAG{192.168.1.0}" },
+];
+
+const server = http.createServer((req, res) => {
+  if (req.method === 'GET' && req.url === '/api/challenges') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    const safeList = challenges.map(c => ({ id: c.id, category: c.category, title: c.title, prompt: c.prompt }));
+    res.end(JSON.stringify(safeList));
+  } 
+  else if (req.method === 'GET' && req.url === '/api/scoreboard') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(scoreboard));
+  }
+  else if (req.method === 'POST' && req.url === '/api/submit') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try {
+        const { username, id, flag, elapsedSeconds } = JSON.parse(body);
+        const name = username ? username.trim() : "Anonymous";
+        
+        if (!scoreboard[name]) scoreboard[name] = 0;
+
+        const challenge = challenges.find(c => c.id === id);
+        if (!challenge) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, message: "Challenge not found." }));
+          return;
+        }
+
+        if (challenge.flag.trim().toLowerCase() === flag.trim().toLowerCase()) {
+          let points = 10;
+          let bonusMessage = "Base Points: 10";
+          if (elapsedSeconds <= 300) { points += 1; bonusMessage += " + 1 Speed Bonus! ⚡"; }
+          else if (elapsedSeconds > 300) { points -= 1; bonusMessage += " - 1 Time Penalty ⏰"; }
+
+          scoreboard[name] += points;
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true, points, message: `Correct! ${bonusMessage}` }));
+        } else {
+          scoreboard[name] = Math.max(0, scoreboard[name] - 2);
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, message: "Incorrect flag! -10 Points penalty." }));
+        }
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, message: "Invalid request format." }));
+      }
+    });
+  } 
+  else {
+    let urlPath = req.url === '/' ? 'index.html' : req.url;
+    let filePath = path.join(__dirname, 'public', urlPath);
+    let extname = path.extname(filePath);
+    let contentType = 'text/html';
+    if (extname === '.js') contentType = 'text/javascript';
+    else if (extname === '.css') contentType = 'text/css';
+
+    fs.readFile(filePath, (err, content) => {
+      if (err) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('404 Not Found');
+      } else {
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(content, 'utf-8');
+      }
+    });
+  }
+});
+
+server.listen(PORT, () => {
+  console.log(`🛡️ CyberDefender Local CTF running at http://localhost:${PORT}`);
+  console.log(`📊 Teacher Scoreboard available at http://localhost:${PORT}/teacher.html`);
+});

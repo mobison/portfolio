@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberDefender Academy CTF</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen p-6">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header & Name Input -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 border-b border-slate-700 pb-4 gap-4">
+            <div>
+                <h1 class="text-3xl font-extrabold text-emerald-400">🛡️ CyberDefender Academy CTF</h1>
+                <p class="text-slate-400 text-sm">Interactive 50-Challenge Cybersecurity Final Exam Suite</p>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="bg-slate-800 border border-slate-700 px-4 py-2 rounded-xl">
+                    <label class="block text-xs text-slate-400">Student Name:</label>
+                    <input type="text" id="student-name" placeholder="Enter your name" 
+                        class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm text-white focus:outline-none focus:border-emerald-500">
+                </div>
+                <div class="bg-slate-800 border border-slate-700 px-6 py-2 rounded-xl text-center">
+                    <span class="block text-xs text-slate-400">My Score</span>
+                    <span id="score-display" class="text-2xl font-black text-amber-400">0</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Challenge Grid -->
+        <div id="challenge-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+    </div>
+
+    <script>
+        let myTotalScore = 0;
+        let startTimes = {};
+
+        async function loadChallenges() {
+            try {
+                const res = await fetch('/api/challenges');
+                const challenges = await res.json();
+                const grid = document.getElementById('challenge-grid');
+                grid.innerHTML = '';
+
+                challenges.forEach(c => {
+                    startTimes[c.id] = Date.now();
+                    const card = document.createElement('div');
+                    card.id = `card-${c.id}`;
+                    card.className = "bg-slate-800 border border-slate-700 rounded-xl p-5 flex flex-col justify-between shadow-md relative";
+                    card.innerHTML = `
+                        <div>
+                            <div class="flex justify-between items-center mb-3">
+                                <span class="text-xs font-semibold px-2.5 py-1 bg-slate-700 text-emerald-300 rounded-full">${c.category}</span>
+                                <span class="text-xs text-slate-400">#${c.id}</span>
+                            </div>
+                            <h3 class="text-lg font-bold text-white mb-2">${c.title}</h3>
+                            <p class="text-sm text-slate-300 mb-4">${c.prompt}</p>
+                        </div>
+                        <div>
+                            <div class="flex gap-2">
+                                <input type="text" id="flag-input-${c.id}" placeholder="FLAG{...}" 
+                                    class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white w-full focus:outline-none focus:border-emerald-500">
+                                <button onclick="submitFlag(${c.id})" 
+                                    class="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition">Submit</button>
+                            </div>
+                            <p id="msg-${c.id}" class="text-xs mt-2 text-center h-4"></p>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch (err) {
+                console.error("Failed to load challenges", err);
+            }
+        }
+
+        async function submitFlag(id) {
+            const usernameInput = document.getElementById('student-name');
+            const username = usernameInput.value.trim();
+            
+            // Require them to type a name first
+            if (!username) {
+                alert("Please enter your name at the top right before submitting flags!");
+                usernameInput.focus();
+                return;
+            }
+
+            const inputField = document.getElementById(`flag-input-${id}`);
+            const msgField = document.getElementById(`msg-${id}`);
+            const flag = inputField.value;
+            const elapsedSeconds = Math.floor((Date.now() - startTimes[id]) / 1000);
+
+            try {
+                const res = await fetch('/api/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, id, flag, elapsedSeconds })
+                });
+
+                const data = await res.json();
+                msgField.textContent = data.message;
+
+                if (data.success) {
+                    msgField.className = "text-xs mt-2 text-center text-emerald-400 font-semibold";
+                    myTotalScore += data.points;
+                    document.getElementById('score-display').textContent = myTotalScore;
+                    inputField.disabled = true; // Lock input once correct
+                } else {
+                    msgField.className = "text-xs mt-2 text-center text-rose-400 font-semibold";
+                }
+            } catch (err) {
+                msgField.textContent = "Error communicating with server.";
+                msgField.className = "text-xs mt-2 text-center text-rose-400 font-semibold";
+            }
+        }
+
+        loadChallenges();
+    </script>
+</body>
+</html>
